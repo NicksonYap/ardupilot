@@ -584,16 +584,31 @@ void Copter::do_nav_guided_enable(const AP_Mission::Mission_Command& cmd)
 // do_nav_delay - Delay the next navigation command
 void Copter::do_nav_delay(const AP_Mission::Mission_Command& cmd)
 {
-    nav_delay_time_start = millis();
-
     if (cmd.content.nav_delay.seconds > 0) {
         // relative delay
+        nav_delay_time_start = millis();
         nav_delay_time_max = cmd.content.nav_delay.seconds * 1000; // convert seconds to milliseconds
+        gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delaying for: %u", (unsigned int)nav_delay_time_max);
     } else {
+        nav_delay_time_start = 0; //make sure to diable relative delay
+
         // absolute delay to utc time
-        nav_delay_time_max = hal.util->get_time_utc(cmd.content.nav_delay.hour_utc, cmd.content.nav_delay.min_utc, cmd.content.nav_delay.sec_utc, 0);
+        //nav_delay_time_max = hal.util->get_time_utc(cmd.content.nav_delay.hour_utc, cmd.content.nav_delay.min_utc, cmd.content.nav_delay.sec_utc, 0);
+
+        //absolute delay from defined referrece time
+        if(nav_delay_abs_time_start == 0){ //if never set before
+            nav_delay_abs_time_start = millis();
+        }
+        if(cmd.content.nav_delay.sec_utc < 0 || cmd.content.nav_delay.min_utc < 0 || cmd.content.nav_delay.hour_utc < 0){ //if explicity asked to reset reference time
+            nav_delay_abs_time_start = millis();
+        }
+
+        nav_delay_time_max = cmd.content.nav_delay.sec_utc * 1000;
+        nav_delay_time_max += cmd.content.nav_delay.min_utc * 60 * 1000;
+        nav_delay_time_max += cmd.content.nav_delay.hour_utc * 60 * 60 * 1000;
+        gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delaying start: %u, end: %u, rel: %u",(unsigned int)nav_delay_abs_time_start, (unsigned int)(nav_delay_abs_time_start+nav_delay_time_max), (unsigned int)nav_delay_time_max);
     }
-    gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delaying %u sec",(unsigned int)(nav_delay_time_max/1000));
+    
 }
 
 #if PARACHUTE == ENABLED
@@ -985,9 +1000,23 @@ bool Copter::verify_nav_guided_enable(const AP_Mission::Mission_Command& cmd)
 // verify_nav_delay - check if we have waited long enough
 bool Copter::verify_nav_delay(const AP_Mission::Mission_Command& cmd)
 {
-    if (millis() - nav_delay_time_start > (uint32_t)MAX(nav_delay_time_max,0)) {
-        nav_delay_time_max = 0;
-        return true;
+    if(nav_delay_time_start != 0){
+        if (millis() - nav_delay_time_start > (uint32_t)MAX(nav_delay_time_max,0)) {
+            //gcs().send_text(MAV_SEVERITY_INFO, "Arrived: %u, end: %u, rel: %u",(unsigned int)nav_delay_time_start, (unsigned int)(millis()), (unsigned int)(millis()-nav_delay_time_start));
+            //gcs().send_text(MAV_SEVERITY_INFO, "Arrived----------");
+            nav_delay_time_start = 0;
+            nav_delay_time_max = 0;
+            return true;
+        }
+    }else{
+        //gcs().send_text(MAV_SEVERITY_INFO, "Approaching: %u, end: %u, rel: %u",(unsigned int)nav_delay_time_start, (unsigned int)(millis()), (unsigned int)(millis()-nav_delay_time_start));
+        if (millis() - nav_delay_abs_time_start > (uint32_t)MAX(nav_delay_time_max,0)) {
+            gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delayin arrive: %u, end: %u, rel: %u",(unsigned int)nav_delay_abs_time_start, (unsigned int)(millis()), (unsigned int)(millis()-nav_delay_abs_time_start));
+            //gcs().send_text(MAV_SEVERITY_INFO, "Arrived----------");
+            //nav_delay_time_max = 0;
+            nav_delay_time_max = 0;
+            return true;
+        }
     }
     return false;
 }
