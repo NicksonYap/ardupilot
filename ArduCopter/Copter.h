@@ -418,6 +418,7 @@ private:
     int32_t nav_delay_time_max;  // used for delaying the navigation commands (eg land,takeoff etc.)
     uint32_t nav_delay_time_start = 0;
     uint32_t nav_delay_abs_time_start = 0;
+    uint32_t nav_delay_debug_time_start = 0;
 
     // Flip
     Vector3f flip_orig_attitude;         // original copter attitude before flip

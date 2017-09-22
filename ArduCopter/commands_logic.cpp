@@ -87,6 +87,7 @@ bool Copter::start_command(const AP_Mission::Mission_Command& cmd)
 
     case MAV_CMD_DO_SET_SERVO:
         ServoRelayEvents.do_set_servo(cmd.content.servo.channel, cmd.content.servo.pwm);
+        gcs_send_text_fmt(MAV_SEVERITY_INFO, "Set servo CH%i, PWM: %i", cmd.content.servo.channel, cmd.content.servo.pwm);
         break;
         
     case MAV_CMD_DO_SET_RELAY:
@@ -1000,22 +1001,38 @@ bool Copter::verify_nav_guided_enable(const AP_Mission::Mission_Command& cmd)
 // verify_nav_delay - check if we have waited long enough
 bool Copter::verify_nav_delay(const AP_Mission::Mission_Command& cmd)
 {
+    uint32_t current_millis = millis();
     if(nav_delay_time_start != 0){
-        if (millis() - nav_delay_time_start > (uint32_t)MAX(nav_delay_time_max,0)) {
+        if (current_millis - nav_delay_time_start >= (uint32_t)MAX(nav_delay_time_max,0)) {
             //gcs().send_text(MAV_SEVERITY_INFO, "Arrived: %u, end: %u, rel: %u",(unsigned int)nav_delay_time_start, (unsigned int)(millis()), (unsigned int)(millis()-nav_delay_time_start));
             //gcs().send_text(MAV_SEVERITY_INFO, "Arrived----------");
+            gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delay complete: %u", (unsigned int)(current_millis-nav_delay_abs_time_start));
             nav_delay_time_start = 0;
             nav_delay_time_max = 0;
             return true;
         }
     }else{
         //gcs().send_text(MAV_SEVERITY_INFO, "Approaching: %u, end: %u, rel: %u",(unsigned int)nav_delay_time_start, (unsigned int)(millis()), (unsigned int)(millis()-nav_delay_time_start));
-        if (millis() - nav_delay_abs_time_start > (uint32_t)MAX(nav_delay_time_max,0)) {
-            gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delayin arrive: %u, end: %u, rel: %u",(unsigned int)nav_delay_abs_time_start, (unsigned int)(millis()), (unsigned int)(millis()-nav_delay_abs_time_start));
+        if (current_millis - nav_delay_abs_time_start >= (uint32_t)MAX(nav_delay_time_max,0)) {
+            gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delayin arrive: %u, end: %u, rel: %u",(unsigned int)nav_delay_abs_time_start, (unsigned int)(current_millis), (unsigned int)(current_millis-nav_delay_abs_time_start));
             //gcs().send_text(MAV_SEVERITY_INFO, "Arrived----------");
             //nav_delay_time_max = 0;
+
+            nav_delay_time_start = 0;
             nav_delay_time_max = 0;
             return true;
+        }else{
+            //debug
+            if(nav_delay_debug_time_start == 0){
+               nav_delay_debug_time_start = current_millis;
+            }
+
+            if (current_millis - nav_delay_debug_time_start >= 1000) { //print output every sec
+                gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delay arriving in: %u",(unsigned int)(unsigned int)(nav_delay_abs_time_start+nav_delay_time_max-current_millis));
+                //gcs().send_text(MAV_SEVERITY_INFO, "Arrived----------");
+                //nav_delay_time_max = 0;
+                nav_delay_debug_time_start = current_millis;
+            }
         }
     }
     return false;
