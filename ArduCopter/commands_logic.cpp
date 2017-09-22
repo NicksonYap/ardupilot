@@ -585,9 +585,10 @@ void Copter::do_nav_guided_enable(const AP_Mission::Mission_Command& cmd)
 // do_nav_delay - Delay the next navigation command
 void Copter::do_nav_delay(const AP_Mission::Mission_Command& cmd)
 {
+    uint32_t current_millis = AP_HAL::millis();
     if (cmd.content.nav_delay.seconds > 0) {
         // relative delay
-        nav_delay_time_start = millis();
+        nav_delay_time_start = current_millis;
         nav_delay_time_max = cmd.content.nav_delay.seconds * 1000; // convert seconds to milliseconds
         gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delaying for: %u", (unsigned int)nav_delay_time_max);
     } else {
@@ -598,10 +599,10 @@ void Copter::do_nav_delay(const AP_Mission::Mission_Command& cmd)
 
         //absolute delay from defined referrece time
         if(nav_delay_abs_time_start == 0){ //if never set before
-            nav_delay_abs_time_start = millis();
+            nav_delay_abs_time_start = current_millis;
         }
         if(cmd.content.nav_delay.sec_utc < 0 || cmd.content.nav_delay.min_utc < 0 || cmd.content.nav_delay.hour_utc < 0){ //if explicity asked to reset reference time
-            nav_delay_abs_time_start = millis();
+            nav_delay_abs_time_start = current_millis;
         }
 
         nav_delay_time_max = cmd.content.nav_delay.sec_utc * 1000;
@@ -1001,7 +1002,7 @@ bool Copter::verify_nav_guided_enable(const AP_Mission::Mission_Command& cmd)
 // verify_nav_delay - check if we have waited long enough
 bool Copter::verify_nav_delay(const AP_Mission::Mission_Command& cmd)
 {
-    uint32_t current_millis = millis();
+    uint32_t current_millis = AP_HAL::millis();
     if(nav_delay_time_start != 0){
         if (current_millis - nav_delay_time_start >= (uint32_t)MAX(nav_delay_time_max,0)) {
             //gcs().send_text(MAV_SEVERITY_INFO, "Arrived: %u, end: %u, rel: %u",(unsigned int)nav_delay_time_start, (unsigned int)(millis()), (unsigned int)(millis()-nav_delay_time_start));
