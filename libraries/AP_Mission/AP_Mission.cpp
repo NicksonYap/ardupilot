@@ -685,8 +685,17 @@ MAV_MISSION_RESULT AP_Mission::mavlink_int_to_mission_cmd(const mavlink_mission_
         break;
 
     case MAV_CMD_DO_SET_ROI:                            // MAV ID: 201
-        copy_location = true;
-        cmd.p1 = packet.param1;                         // 0 = no roi, 1 = next waypoint, 2 = waypoint number, 3 = fixed location, 4 = given target (not supported)
+        //copy_location = true;
+        //cmd.p1 = packet.param1;                         // 0 = no roi, 1 = next waypoint, 2 = waypoint number, 3 = fixed location, 4 = given target (not supported)
+
+        cmd.id = MAV_CMD_NAV_DELAY;
+
+        cmd.content.nav_delay.seconds = (float)packet.y/10000000; // delay in seconds
+        cmd.content.nav_delay.sec_utc = -1; // absolute time's min (utc)
+        cmd.content.nav_delay.min_utc = packet.x/10000000; // absolute time's hour (utc)
+        cmd.content.nav_delay.hour_utc = 0; // absolute time's hour (utc)
+
+
         break;
 
     case MAV_CMD_DO_DIGICAM_CONFIGURE:                  // MAV ID: 202

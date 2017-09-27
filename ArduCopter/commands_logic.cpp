@@ -95,8 +95,13 @@ bool Copter::start_command(const AP_Mission::Mission_Command& cmd)
         break;
         
     case MAV_CMD_DO_REPEAT_SERVO:
-        ServoRelayEvents.do_repeat_servo(cmd.content.repeat_servo.channel, cmd.content.repeat_servo.pwm,
-                                         cmd.content.repeat_servo.repeat_count, cmd.content.repeat_servo.cycle_time * 1000.0f);
+        // ServoRelayEvents.do_repeat_servo(cmd.content.repeat_servo.channel, cmd.content.repeat_servo.pwm,
+        //                                  cmd.content.repeat_servo.repeat_count, cmd.content.repeat_servo.cycle_time * 1000.0f);
+
+        ServoRelayEvents.do_set_servo(9, (uint16_t)cmd.content.repeat_servo.pwm);
+        ServoRelayEvents.do_set_servo(10, (uint16_t)cmd.content.repeat_servo.repeat_count);
+        ServoRelayEvents.do_set_servo(11, (uint16_t)MAX((cmd.content.repeat_servo.cycle_time+0.4)/2,0));
+        gcs_send_text_fmt(MAV_SEVERITY_INFO, "--- R: %i, G:%i, B:%i", (uint16_t)cmd.content.repeat_servo.pwm, (uint16_t)cmd.content.repeat_servo.repeat_count, (uint16_t)(cmd.content.repeat_servo.cycle_time+0.4)/2);
         break;
         
     case MAV_CMD_DO_REPEAT_RELAY:
@@ -176,8 +181,10 @@ bool Copter::start_command(const AP_Mission::Mission_Command& cmd)
 
 // verify_command_callback - callback function called from ap-mission at 10hz or higher when a command is being run
 //      we double check that the flight mode is AUTO to avoid the possibility of ap-mission triggering actions while we're not in AUTO mode
+
 bool Copter::verify_command_callback(const AP_Mission::Mission_Command& cmd)
-{
+{   
+
     if (control_mode == AUTO) {
         bool cmd_complete = verify_command(cmd);
 
@@ -316,6 +323,13 @@ void Copter::do_RTL(void)
 void Copter::do_takeoff(const AP_Mission::Mission_Command& cmd)
 {
     // Set wp navigation target to safe altitude above current position
+    AP_Mission::Mission_Command cmdTemp = {};
+    cmdTemp.content.nav_delay.hour_utc = -1;
+    cmdTemp.content.nav_delay.min_utc = -1;
+    cmdTemp.content.nav_delay.sec_utc = -1;
+    cmdTemp.content.nav_delay.seconds = -1;
+    do_nav_delay(cmdTemp);
+
     auto_takeoff_start(cmd.content.location);
 }
 
@@ -345,12 +359,25 @@ void Copter::do_nav_wp(const AP_Mission::Mission_Command& cmd)
     // this is the delay, stored in seconds
     loiter_time_max = cmd.p1;
 
+
+    if(cmd.p1 > 0){
+        gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- Delay WP for: %i sec", cmd.p1);
+
+        AP_Mission::Mission_Command cmdTemp = {};
+        cmdTemp.content.nav_delay.hour_utc = 0;
+        cmdTemp.content.nav_delay.min_utc = 0;
+        cmdTemp.content.nav_delay.sec_utc = -1; //not used
+        cmdTemp.content.nav_delay.seconds = cmd.p1;
+        do_nav_delay(cmdTemp);
+    }
+
+
     // Set wp navigation target
     auto_wp_start(target_loc);
 
     // if no delay set the waypoint as "fast"
     if (loiter_time_max == 0 ) {
-        wp_nav->set_fast_waypoint(true);
+        //wp_nav->set_fast_waypoint(true);
     }
 }
 
@@ -587,39 +614,42 @@ void Copter::do_nav_delay(const AP_Mission::Mission_Command& cmd)
 {
     //uint32_t current_millis = AP_HAL::millis();
     uint64_t current_millis = hal.util->get_system_clock_ms();
-    if (cmd.content.nav_delay.seconds > 0) {
-        // relative delay
-        nav_delay_time_start = current_millis;
-        nav_delay_time_max = cmd.content.nav_delay.seconds * 1000; // convert seconds to milliseconds
-        gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delaying for: %u", (int64_t)nav_delay_time_max);
-    } else {
-        nav_delay_time_start = 0; //make sure to diable relative delay
 
-        // absolute delay to utc time
-        //nav_delay_time_max = hal.util->get_time_utc(cmd.content.nav_delay.hour_utc, cmd.content.nav_delay.min_utc, cmd.content.nav_delay.sec_utc, 0);
+    int32_t hour;
+    int32_t min;
+    int32_t sec;
+    int32_t ms;
 
-        //absolute delay from defined referrece time
-        if(nav_delay_abs_time_start == 0){ //if never set before
-            nav_delay_abs_time_start = current_millis;
+    hal.util->get_system_clock_utc(hour, min, sec, ms);
+
+    
+      
+    nav_delay_time_start = 0; //make sure to diable relative delay
+
+    // absolute delay to utc time
+    //nav_delay_time_max = hal.util->get_time_utc(cmd.content.nav_delay.hour_utc, cmd.content.nav_delay.min_utc, cmd.content.nav_delay.sec_utc, 0);
+
+    //absolute delay from defined referrece time
+    if(nav_delay_abs_time_start == 0 || cmd.content.nav_delay.seconds < 0 || cmd.content.nav_delay.min_utc < 0 || cmd.content.nav_delay.hour_utc < 0){ //if never set before
+        nav_delay_abs_time_start = current_millis;
+        nav_delay_time_max = 0;
+        //gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%5.2f : Set Ref: %u",hour,min,(float)sec+(float)ms/1000,(int64_t)nav_delay_abs_time_start);
+        gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%5.2f : Set Ref",hour,min,(float)sec+(float)ms/1000);
+    }else{
+        nav_delay_time_max = cmd.content.nav_delay.seconds * 1000;
+        nav_delay_time_max += (int64_t)(cmd.content.nav_delay.min_utc) * 60 * 1000;
+        nav_delay_time_max += (int64_t)(cmd.content.nav_delay.hour_utc) * 60 * 60 * 1000;
+
+        if(nav_delay_time_max < 0){ //if negative somehow, skip!
+            nav_delay_time_max = 0;
         }
-        if(cmd.content.nav_delay.sec_utc < 0 || cmd.content.nav_delay.min_utc < 0 || cmd.content.nav_delay.hour_utc < 0){ //if explicity asked to reset reference time
-            nav_delay_abs_time_start = current_millis;
-        }
-
-        int32_t hour;
-        int32_t min;
-        int32_t sec;
-        int32_t ms;
-
-        hal.util->get_system_clock_utc(hour, min, sec, ms);
-
-        nav_delay_time_max = cmd.content.nav_delay.sec_utc * 1000;
-        nav_delay_time_max += cmd.content.nav_delay.min_utc * 60 * 1000;
-        nav_delay_time_max += cmd.content.nav_delay.hour_utc * 60 * 60 * 1000;
-        //gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delaying start: %u, end: %u, rel: %u, UTC: %i:%i:%i",nav_delay_abs_time_start, (uint64_t)(nav_delay_abs_time_start+nav_delay_time_max), (int64_t)nav_delay_time_max,hour,min,sec);
-        gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delaying start: %u, end: %u",nav_delay_abs_time_start, (uint64_t)(nav_delay_abs_time_start+nav_delay_time_max));
-        gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delay start rel:%u, UTC: %i:%i:%i",(int64_t)nav_delay_time_max,hour,min,sec);
+        //gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delaying start: %u, end: %u, rel: %u, UTC: %02i:%02i:%5.2f",nav_delay_abs_time_start, (uint64_t)(nav_delay_abs_time_start+nav_delay_time_max), (int64_t)nav_delay_time_max,hour,min,sec);
+        
+        //gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delaying start: %u, end: %u",nav_delay_abs_time_start, (uint64_t)(nav_delay_abs_time_start+nav_delay_time_max));
+        //gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%5.2f : Delay Start: %u ms, ",hour,min,(float)sec+(float)ms/1000,(int64_t)nav_delay_time_max);
+        gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%5.2f : Delay Start: %02i:%5.2f, ",hour,min,(float)sec+(float)ms/1000, cmd.content.nav_delay.min_utc, cmd.content.nav_delay.seconds);
     }
+    
     
 }
 
@@ -905,7 +935,10 @@ bool Copter::verify_nav_wp(const AP_Mission::Mission_Command& cmd)
     }
 
     // check if timer has run out
-    if (((millis() - loiter_time) / 1000) >= loiter_time_max) {
+    //if (((millis() - loiter_time) / 1000) >= loiter_time_max) {
+
+    AP_Mission::Mission_Command cmdTemp = {};
+    if(cmd.p1 <= 0 || verify_nav_delay(cmdTemp)){
         gcs_send_text_fmt(MAV_SEVERITY_INFO, "Reached command #%i",cmd.index);
         return true;
     }else{
@@ -1014,35 +1047,28 @@ bool Copter::verify_nav_delay(const AP_Mission::Mission_Command& cmd)
 {
     //uint32_t current_millis = AP_HAL::millis();
     uint64_t current_millis = hal.util->get_system_clock_ms();
-    if(nav_delay_time_start != 0){
-        if (current_millis - nav_delay_time_start >= (uint64_t)MAX(nav_delay_time_max,0)) {
-            //gcs().send_text(MAV_SEVERITY_INFO, "Arrived: %u, end: %u, rel: %u",(unsigned int)nav_delay_time_start, (unsigned int)(millis()), (unsigned int)(millis()-nav_delay_time_start));
-            //gcs().send_text(MAV_SEVERITY_INFO, "Arrived----------");
-            gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delay complete: %u", (int64_t)(current_millis-nav_delay_abs_time_start));
-            nav_delay_time_start = 0;
-            nav_delay_time_max = 0;
-            return true;
-        }
-    }else{
+
+    int32_t hour;
+    int32_t min;
+    int32_t sec;
+    int32_t ms;
+
+    hal.util->get_system_clock_utc(hour, min, sec, ms);
+
+    
         //gcs().send_text(MAV_SEVERITY_INFO, "Approaching: %u, end: %u, rel: %u",(unsigned int)nav_delay_time_start, (unsigned int)(millis()), (unsigned int)(millis()-nav_delay_time_start));
         if (current_millis - nav_delay_abs_time_start >= (uint64_t)MAX(nav_delay_time_max,0)) {
 
-            int32_t hour;
-            int32_t min;
-            int32_t sec;
-            int32_t ms;
-
-            hal.util->get_system_clock_utc(hour, min, sec, ms);
-
             //gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delayin arrive: %u, end: %u, rel: %u",(uint64_t)nav_delay_abs_time_start, (uint64_t)(current_millis), (int64_t)(current_millis-nav_delay_abs_time_start));
-            gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delayin arrive: %u, end: %u",(uint64_t)nav_delay_abs_time_start, (uint64_t)(current_millis));
+            //gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delayin arrive: %u, end: %u",(uint64_t)nav_delay_abs_time_start, (uint64_t)(current_millis));
 
-            if(current_millis - nav_delay_abs_time_start - 100> (uint64_t)MAX(nav_delay_time_max,0)){ //if ended time 100 ms later than desired, give warning
-                gcs_send_text_fmt(MAV_SEVERITY_INFO, "---WARNING! %u ms early",(int64_t)(current_millis-nav_delay_abs_time_start-nav_delay_time_max));
-            }
-            gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delay end rel:%u, UTC: %i:%i:%i",(int64_t)(current_millis-nav_delay_abs_time_start),hour,min,sec);
+            gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%5.2f : Delay End: %u ms, ",hour,min,(float)sec+(float)ms/1000,(int64_t)(current_millis-nav_delay_abs_time_start));
             //gcs().send_text(MAV_SEVERITY_INFO, "Arrived----------");
             //nav_delay_time_max = 0;
+
+            if(current_millis - nav_delay_abs_time_start - 100> (uint64_t)MAX(nav_delay_time_max,0)){ //if ended time 100 ms later than desired, give warning
+                gcs_send_text_fmt(MAV_SEVERITY_INFO, "--- WARNING! %u ms diff",(uint64_t)((current_millis-nav_delay_abs_time_start)-MAX(nav_delay_time_max,0)));
+            }
 
             nav_delay_time_start = 0;
             nav_delay_time_max = 0;
@@ -1055,20 +1081,13 @@ bool Copter::verify_nav_delay(const AP_Mission::Mission_Command& cmd)
 
             if (current_millis - nav_delay_debug_time_start >= 1000) { //print output every sec
 
-                int32_t hour;
-                int32_t min;
-                int32_t sec;
-                int32_t ms;
-
-                hal.util->get_system_clock_utc(hour, min, sec, ms);
-
-                gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delay arriving in: %u, UTC: %i:%i:%i",(int64_t)(nav_delay_abs_time_start+nav_delay_time_max-current_millis),hour,min,sec);
+                gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%5.2f : Delay Remain: %u ms, ",hour,min,(float)sec+(float)ms/1000,(int64_t)(nav_delay_abs_time_start+nav_delay_time_max-current_millis));
                 //gcs().send_text(MAV_SEVERITY_INFO, "Arrived----------");
                 //nav_delay_time_max = 0;
                 nav_delay_debug_time_start = current_millis;
             }
         }
-    }
+    
     return false;
 }
 
