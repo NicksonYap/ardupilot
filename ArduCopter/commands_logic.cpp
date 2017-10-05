@@ -666,7 +666,17 @@ void Copter::do_nav_delay(const AP_Mission::Mission_Command& cmd)
         
         //gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delaying start: %u, end: %u",nav_delay_abs_time_start, (uint64_t)(nav_delay_abs_time_start+nav_delay_time_max));
         //gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%02i.%02i : Delay Start: %u ms, ",hour,min,sec,ms,(int64_t)nav_delay_time_max);
-        gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%02i.%02i : Delay Start: %02i:%5.2f, ",hour,min,sec,ms, cmd.content.nav_delay.min_utc, cmd.content.nav_delay.seconds);
+        
+        //gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%02i.%02i : Delay Start: %02i:%5.2f, ",hour,min,sec,ms, cmd.content.nav_delay.min_utc, cmd.content.nav_delay.seconds);
+
+        int64_t oriMilliseconds = current_millis-nav_delay_abs_time_start;
+        int milliseconds = oriMilliseconds % 1000;
+        int seconds = (oriMilliseconds / 1000) % 60 ;
+        int minutes = (int) ((oriMilliseconds / (1000*60)) % 60);
+        int hours = (int) ((oriMilliseconds / (1000*60*60)) % 24);
+
+        gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- Rel: %02i:%02i:%02i.%04i",hours,minutes,seconds,milliseconds);
+
     }
     
     
@@ -1096,7 +1106,7 @@ bool Copter::verify_nav_delay(const AP_Mission::Mission_Command& cmd)
             //gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delayin arrive: %u, end: %u, rel: %u",(uint64_t)nav_delay_abs_time_start, (uint64_t)(current_millis), (int64_t)(current_millis-nav_delay_abs_time_start));
             //gcs_send_text_fmt(MAV_SEVERITY_INFO, "Delayin arrive: %u, end: %u",(uint64_t)nav_delay_abs_time_start, (uint64_t)(current_millis));
 
-            gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%02i.%02i : Delay End: %u ms, ",hour,min,sec,ms,(int64_t)(current_millis-nav_delay_abs_time_start));
+            //gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%02i.%02i : Delay End: %u ms, ",hour,min,sec,ms,(int64_t)(current_millis-nav_delay_abs_time_start));
             
 
             int64_t oriMilliseconds = current_millis-nav_delay_abs_time_start;
@@ -1125,7 +1135,17 @@ bool Copter::verify_nav_delay(const AP_Mission::Mission_Command& cmd)
 
             if (current_millis - nav_delay_debug_time_start >= 1000) { //print output every sec
 
-                gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%02i.%02i : Delay Remain: %u ms, ",hour,min,sec,ms,(int64_t)(nav_delay_abs_time_start+nav_delay_time_max-current_millis));
+                //gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%02i.%02i : Delay Remain: %u ms, ",hour,min,sec,ms,(int64_t)(nav_delay_abs_time_start+nav_delay_time_max-current_millis));
+
+                int64_t oriMilliseconds = current_millis-nav_delay_abs_time_start;
+                int milliseconds = oriMilliseconds % 1000;
+                int seconds = (oriMilliseconds / 1000) % 60 ;
+                int minutes = (int) ((oriMilliseconds / (1000*60)) % 60);
+                int hours = (int) ((oriMilliseconds / (1000*60*60)) % 24);
+
+                gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- Rel: %02i:%02i:%02i.%04i",hours,minutes,seconds,milliseconds);
+
+
                 //gcs().send_text(MAV_SEVERITY_INFO, "Arrived----------");
                 //nav_delay_time_max = 0;
                 nav_delay_debug_time_start = current_millis;
