@@ -14,15 +14,15 @@ bool Copter::start_command(const AP_Mission::Mission_Command& cmd)
     /// navigation commands
     ///
     case MAV_CMD_NAV_TAKEOFF:                   // 22
-        do_takeoff(cmd);
+        //do_takeoff(cmd);
         break;
 
     case MAV_CMD_NAV_WAYPOINT:                  // 16  Navigate to Waypoint
-        do_nav_wp(cmd);
+        //do_nav_wp(cmd);
         break;
 
     case MAV_CMD_NAV_LAND:              // 21 LAND to Waypoint
-        do_land(cmd);
+        //do_land(cmd);
         break;
 
     case MAV_CMD_NAV_PAYLOAD_PLACE:              // 94 place at Waypoint
@@ -46,7 +46,7 @@ bool Copter::start_command(const AP_Mission::Mission_Command& cmd)
         break;
 
     case MAV_CMD_NAV_SPLINE_WAYPOINT:           // 82  Navigate to Waypoint using spline
-        do_spline_wp(cmd);
+        //do_spline_wp(cmd);
         break;
 
 #if NAV_GUIDED == ENABLED
@@ -71,7 +71,7 @@ bool Copter::start_command(const AP_Mission::Mission_Command& cmd)
         break;
 
     case MAV_CMD_CONDITION_YAW:             // 115
-        do_yaw(cmd);
+        //do_yaw(cmd);
         break;
 
     ///
@@ -229,13 +229,16 @@ bool Copter::verify_command(const AP_Mission::Mission_Command& cmd)
     // navigation commands
     //
     case MAV_CMD_NAV_TAKEOFF:
-        return verify_takeoff();
+        //return verify_takeoff();
+        return true;
 
     case MAV_CMD_NAV_WAYPOINT:
-        return verify_nav_wp(cmd);
+        //return verify_nav_wp(cmd);
+        return true;
 
     case MAV_CMD_NAV_LAND:
-        return verify_land();
+        //return verify_land();
+        return true;
 
     case MAV_CMD_NAV_PAYLOAD_PLACE:
         return verify_payload_place();
@@ -253,7 +256,8 @@ bool Copter::verify_command(const AP_Mission::Mission_Command& cmd)
         return verify_RTL();
 
     case MAV_CMD_NAV_SPLINE_WAYPOINT:
-        return verify_spline_wp(cmd);
+        //return verify_spline_wp(cmd);
+        return true;
 
 #if NAV_GUIDED == ENABLED
     case MAV_CMD_NAV_GUIDED_ENABLE:
@@ -273,7 +277,8 @@ bool Copter::verify_command(const AP_Mission::Mission_Command& cmd)
         return verify_within_distance();
 
     case MAV_CMD_CONDITION_YAW:
-        return verify_yaw();
+        //return verify_yaw();
+        return true;
 
     // do commands (always return true)
     case MAV_CMD_DO_CHANGE_SPEED:
