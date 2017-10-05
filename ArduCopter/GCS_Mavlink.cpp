@@ -1232,7 +1232,21 @@ void GCS_MAVLINK_Copter::handleMessage(mavlink_message_t* msg)
             break;
 
         case MAV_CMD_MISSION_START:
-            if (copter.motors->armed() && copter.set_mode(AUTO, MODE_REASON_GCS_COMMAND)) {
+            if (copter.motors->armed() && copter.set_mode(AUTO, MODE_REASON_GCS_COMMAND)){
+
+                int32_t hour;
+                int32_t min;
+                int32_t sec;
+                int32_t ms;
+
+                hal.util->get_system_clock_utc(hour, min, sec, ms);
+
+                copter.gcs_send_text(MAV_SEVERITY_INFO, "Started Mission");
+                copter.nav_delay_abs_time_start = hal.util->get_system_clock_ms();
+
+                copter.gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%5.2f : Set Ref",hour,min,(float)sec+(float)ms/1000);
+
+
                 copter.set_auto_armed(true);
                 if (copter.mission.state() != AP_Mission::MISSION_RUNNING) {
                     copter.mission.start_or_resume();

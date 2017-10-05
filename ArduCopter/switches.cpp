@@ -369,7 +369,23 @@ void Copter::do_aux_switch_function(int8_t ch_function, uint8_t ch_flag)
 
         case AUXSW_AUTO:
             if (ch_flag == AUX_SWITCH_HIGH) {
-                set_mode(AUTO, MODE_REASON_TX_COMMAND);
+
+                if(set_mode(AUTO, MODE_REASON_TX_COMMAND)){
+                    int32_t hour;
+                    int32_t min;
+                    int32_t sec;
+                    int32_t ms;
+
+                    hal.util->get_system_clock_utc(hour, min, sec, ms);
+
+                    gcs_send_text(MAV_SEVERITY_INFO, "Started Mission");
+                    nav_delay_abs_time_start = hal.util->get_system_clock_ms();
+
+                    gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- UTC: %02i:%02i:%5.2f : Set Ref",hour,min,(float)sec+(float)ms/1000);
+                }   
+
+                
+
             } else {
                 // return to flight mode switch's flight mode if we are currently in AUTO
                 if (control_mode == AUTO) {
