@@ -339,7 +339,8 @@ void Copter::do_RTL(void)
 // do_takeoff - initiate takeoff navigation command
 void Copter::do_takeoff(const AP_Mission::Mission_Command& cmd)
 {
-    if(nav_delay_abs_time_start == 0){ //if abs time not set, do a favor to set it
+    //if(nav_delay_abs_time_start == 0){ //if abs time not set, do a favor to set it
+    if(true){ //if abs time not set, do a favor to set it
         // Set wp navigation target to safe altitude above current position
         AP_Mission::Mission_Command cmdTemp = {};
         cmdTemp.content.nav_delay.hour_utc = -1;
@@ -970,12 +971,9 @@ bool Copter::verify_nav_wp(const AP_Mission::Mission_Command& cmd)
     if(cmd.p1 <= 0 || verify_nav_delay(cmdTemp)){
         gcs_send_text_fmt(MAV_SEVERITY_INFO, "Reached command #%i",cmd.index);
 
-
         uint64_t current_millis = hal.util->get_system_clock_ms();
 
-
         int64_t oriMilliseconds = current_millis-nav_delay_abs_time_start;
-        
 
         int milliseconds = oriMilliseconds % 1000;
         int seconds = (oriMilliseconds / 1000) % 60 ;
@@ -1066,6 +1064,18 @@ bool Copter::verify_spline_wp(const AP_Mission::Mission_Command& cmd)
     // check if timer has run out
     if (((millis() - loiter_time) / 1000) >= loiter_time_max) {
         gcs_send_text_fmt(MAV_SEVERITY_INFO, "Reached command #%i",cmd.index);
+
+        uint64_t current_millis = hal.util->get_system_clock_ms();
+
+        int64_t oriMilliseconds = current_millis-nav_delay_abs_time_start;
+
+        int milliseconds = oriMilliseconds % 1000;
+        int seconds = (oriMilliseconds / 1000) % 60 ;
+        int minutes = (int) ((oriMilliseconds / (1000*60)) % 60);
+        int hours = (int) ((oriMilliseconds / (1000*60*60)) % 24);
+
+        gcs_send_text_fmt(MAV_SEVERITY_INFO, "-- Rel: %02i:%02i:%02i.%04i",hours,minutes,seconds,milliseconds);
+
         return true;
     }else{
         return false;
